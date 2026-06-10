@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>나의 운동 관리 대시보드</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .hidden { display: none; }
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm">
+            <h1 class="text-2xl font-bold text-gray-800 mb-6 text-center">로그인</h1>
+            <input type="text" id="username" placeholder="아이디 (user)" class="w-full p-3 mb-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <input type="password" id="password" placeholder="비밀번호 (userpass)" class="w-full p-3 mb-6 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button onclick="handleLogin()" class="w-full bg-blue-600 text-white p-3 rounded-lg font-bold hover:bg-blue-700 transition">로그인</button>
+            <p id="login-error" class="text-red-500 text-sm mt-4 hidden text-center">아이디 또는 비밀번호가 틀렸습니다.</p>
+        </div>
+    </div>
+
+    <div id="dashboard-screen" class="hidden min-h-screen p-4 md:p-8">
+        <div class="max-w-4xl mx-auto">
+            <div class="flex justify-between items-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-800">운동 기록</h1>
+                <button onclick="handleLogout()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300">로그아웃</button>
+            </div>
+
+            <!-- Calendar Navigation -->
+            <div class="bg-white p-4 rounded-xl shadow-sm mb-6">
+                <div class="flex justify-between items-center mb-2">
+                    <button onclick="changeYear(-1)" class="px-3 py-1 font-bold bg-gray-100 rounded">«</button>
+                    <h2 id="current-year" class="text-lg font-bold">2026년</h2>
+                    <button onclick="changeYear(1)" class="px-3 py-1 font-bold bg-gray-100 rounded">»</button>
+                </div>
+                <div class="flex justify-between items-center">
+                    <button onclick="changeMonth(-1)" class="px-3 py-1 font-bold bg-gray-100 rounded">◀</button>
+                    <h2 id="current-month" class="text-xl font-semibold">6월</h2>
+                    <button onclick="changeMonth(1)" class="px-3 py-1 font-bold bg-gray-100 rounded">▶</button>
+                </div>
+            </div>
+
+            <!-- Calendar Grid -->
+            <div id="calendar-grid" class="grid grid-cols-7 gap-2">
+            </div>
+        </div>
+    </div>
+
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-2xl w-full max-w-sm">
+            <h3 id="modal-date" class="text-lg font-bold mb-4">날짜</h3>
+            <div id="exercise-list" class="space-y-4">
+            </div>
+            <button onclick="closeModal()" class="w-full mt-6 bg-gray-800 text-white p-3 rounded-lg">닫기</button>
+        </div>
+    </div>
+
+    <script>
+        // 운동 데이터 정의: 이름과 목표치
+        const EXERCISES = [
+            { id: 'pushup', name: '팔굽혀 펴기', target: 50, unit: '회' },
+            { id: 'stairs', name: '계단 오르기', target: 10, unit: '층' },
+            { id: 'running', name: '러닝', target: 5, unit: 'km' },
+            { id: 'squat', name: '스쿼트', target: 50, unit: '회' }
+        ];
+
+        let isLoggedIn = false;
+        let currentDate = new Date();
+        // 로컬 스토리지 데이터 구조: { '2026-6-10': { 'pushup': 25, 'stairs': 5 ... } }
+        let exerciseData = JSON.parse(localStorage.getItem('my_exercises') || '{}');
+
+        function handleLogin() {
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            if (user === 'user' && pass === 'userpass') {
+                isLoggedIn = true;
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('dashboard-screen').classList.remove('hidden');
+                renderCalendar();
+            } else {
+                document.getElementById('login-error').classList.remove('hidden');
+            }
+        }
+
+        function handleLogout() { window.location.reload(); }
+
+        function changeMonth(delta) {
+            currentDate.setMonth(currentDate.getMonth() + delta);
+            renderCalendar();
+        }
+
+        function changeYear(delta) {
+            currentDate.setFullYear(currentDate.getFullYear() + delta);
+            renderCalendar();
+        }
+
+        function updateExercise(dateKey, exerciseId, value) {
+            if (!exerciseData[dateKey]) exerciseData[dateKey] = {};
+            exerciseData[dateKey][exerciseId] = parseInt(value) || 0;
+            localStorage.setItem('my_exercises', JSON.stringify(exerciseData));
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+            
+            const monthNames = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
+            document.getElementById('current-year').innerText = `${currentDate.getFullYear()}년`;
+            document.getElementById('current-month').innerText = `${monthNames[currentDate.getMonth()]}`;
+
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dateKey = `${year}-${month + 1}-${i}`;
+                const dailyData = exerciseData[dateKey] || {};
+                
+                // 달성률 계산: (입력값/목표값의 평균) * 100
+                let totalPercentage = 0;
+                EXERCISES.forEach(ex => {
+                    const val = dailyData[ex.id] || 0;
+                    totalPercentage += Math.min(100, (val / ex.target) * 100);
+                });
+                const avgPercentage = Math.round(totalPercentage / EXERCISES.length);
+                
+                const div = document.createElement('div');
+                div.className = `p-2 rounded-lg border cursor-pointer ${avgPercentage > 0 ? 'bg-blue-100' : 'bg-white'}`;
+                div.innerHTML = `
+                    <div class="font-bold text-sm">${i}일</div>
+                    <div class="text-xs font-bold text-blue-800">${avgPercentage}%</div>
+                `;
+                div.onclick = () => openModal(dateKey);
+                grid.appendChild(div);
+            }
+        }
+
+        function openModal(dateKey) {
+            document.getElementById('modal-date').innerText = dateKey;
+            const list = document.getElementById('exercise-list');
+            list.innerHTML = '';
+            
+            EXERCISES.forEach(ex => {
+                const currentVal = exerciseData[dateKey]?.[ex.id] || 0;
+                list.innerHTML += `
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span>${ex.name}</span>
+                            <span>${currentVal} / ${ex.target}${ex.unit}</span>
+                        </div>
+                        <input type="number" 
+                               value="${currentVal}" 
+                               oninput="updateExercise('${dateKey}', '${ex.id}', this.value)" 
+                               class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                `;
+            });
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+        function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+    </script>
+</body>
+</html>
